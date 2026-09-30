@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/*
+  Design tokens for Dockie.
+  Change a colour here and it updates everywhere in the app.
+  Use them in components as Tailwind classes, e.g. bg-surface, text-muted, border-line.
+*/
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --color-canvas: oklch(0.985 0.003 250);   /* page background */
+  --color-surface: oklch(1 0 0);            /* cards, panels */
+  --color-subtle: oklch(0.965 0.005 250);   /* hover rows, inputs */
+  --color-line: oklch(0.92 0.006 250);      /* borders */
+  --color-ink: oklch(0.22 0.02 260);        /* main text */
+  --color-muted: oklch(0.52 0.015 260);     /* secondary text */
+
+  --color-brand: oklch(0.52 0.19 262);      /* Dockie blue */
+  --color-brand-strong: oklch(0.45 0.19 262);
+  --color-brand-soft: oklch(0.95 0.03 262);
+
+  --color-ok: oklch(0.55 0.13 155);
+  --color-ok-soft: oklch(0.95 0.04 155);
+  --color-warn: oklch(0.6 0.13 70);
+  --color-warn-soft: oklch(0.96 0.05 85);
+  --color-bad: oklch(0.56 0.19 25);
+  --color-bad-soft: oklch(0.95 0.03 25);
+  --color-info: oklch(0.55 0.12 230);
+  --color-info-soft: oklch(0.95 0.03 230);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
