@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dockie — Customer Platform (frontend)
 
-## Getting Started
-
-First, run the development server:
+Customer workspace for Dockie, the AI logistics agent for moving vehicles.
+**Next.js (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix, zinc).**
+All data is mocked. See `docs/design-audit.md` for the PRD audit and Mobbin references.
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Try these
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| What | Where |
+|---|---|
+| Ask Dockie with page context | Open any shipment → **Ask Dockie** |
+| Agent action + confirmation | On `DK-10482`, Actions → Edit shipment (succeeds); on `DK-10477` it fails because the shipment is locked |
+| Chat-first new shipment | Shipments → **New shipment** (VIN `5FNYF6H59LB041278`) |
+| Upload flow | Documents → Upload (a file name containing "blur" is rejected) |
+| Permission states | Avatar menu → Preview as role → Viewer |
+| Empty Home (new org) | `/home?state=empty` |
+| Onboarding | `/onboarding/signup` (code `000000` shows the error state) |
+| Global search | Ctrl/⌘ + K |
 
-## Learn More
+## How it's organised
 
-To learn more about Next.js, take a look at the following resources:
+**Folders under `src/app` become URLs.** `(app)` and `(auth)` are route groups, which organise files but don't appear in the URL.
+`[id]` is a dynamic segment.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/app/
+├── (app)/                     signed-in workspace — layout.tsx adds sidebar, header, Dockie panel
+│   ├── home/                  /home
+│   ├── chats/ [id]/           /chats, /chats/c1, /chats/new
+│   ├── shipments/ [id]/       /shipments, /shipments/DK-10482?tab=documents
+│   ├── tracking/              /tracking?id=DK-10482
+│   ├── documents/             /documents?status=required
+│   ├── payments/              /payments?invoice=INV-10283
+│   ├── analytics/  settings/  profile/
+│   ├── loading.tsx            skeleton while pages load
+│   └── error.tsx              contextual error + Try again
+└── (auth)/
+    ├── login/
+    └── onboarding/[step]/     signup → verify-email → verify-phone → account-type → business → team → walkthrough
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+src/components/
+├── ui/          shadcn components (add more: npx shadcn@latest add <name>)
+├── app/         shell: sidebar, header, search, notifications, workspace store, shared states
+├── domain/      StatusBadge, ETADisplay, LocationDisplay, Timeline, Journey (PRD §15)
+├── dockie/      agent: engine (mock), conversation hook, panel, action card, composer + voice
+└── home/ shipments/ tracking/ documents/ payments/ analytics/ chats/ settings/ onboarding/
 
-## Deploy on Vercel
+src/lib/
+├── types.ts        data contracts
+├── data.ts         mock data
+├── status.ts       15 canonical shipment states, journeys, document/payment statuses
+├── permissions.ts  roles → capabilities
+└── format.ts       dates, money ("today" is fixed at Sep 30, 2026)
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Common tasks
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Add a page:** create `src/app/(app)/<name>/page.tsx`, then add it to `src/lib/nav.ts`.
+- **Add a shadcn component:** `npx shadcn@latest add <name>`. It's copied into `src/components/ui/` and you own it.
+- **Retheme:** edit the CSS variables in `src/app/globals.css`.
+- **Give Dockie context on a new page:** render `<SetDockieContext context={{ kind: "…" }} />`.
+- **Connect the backend:** replace the mock data in `src/lib/data.ts` and the setters in `components/app/workspace-provider.tsx`. Point `respond()` in `components/dockie/engine.ts` at the agent API.

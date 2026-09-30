@@ -1,68 +1,167 @@
-// Shared shapes for the data the UI shows.
-// When the backend is ready, its API responses should match these types.
+// Data shapes for the Dockie workspace.
+// The backend's API responses should match these types.
 
+/** The 15 canonical shipment states (PRD §2.4). */
 export type ShipmentStatus =
   | "booked"
+  | "offer_received"
+  | "transporter_assigned"
+  | "enroute_to_pickup"
   | "picked_up"
   | "in_transit"
-  | "customs"
-  | "out_for_delivery"
-  | "delivered"
-  | "delayed";
+  | "issue_reported"
+  | "in_storage"
+  | "at_origin_port"
+  | "clearing_customs"
+  | "loaded_on_vessel"
+  | "in_transit_ocean"
+  | "arrived_destination_port"
+  | "ready_for_collection"
+  | "delivered";
 
-export type ShipmentMode = "road" | "air" | "ocean";
+/** Inland shipments hide ocean-specific states. */
+export type ShipmentType = "inland" | "ocean";
 
-export interface Place {
-  city: string;
-  country: string;
-  address?: string;
+export interface Vehicle {
+  vin: string;
+  year: number;
+  make: string;
+  model: string;
+  trim?: string;
+  color?: string;
+  purchaseDate: string;
 }
 
-export interface TrackingEvent {
-  at: string; // ISO date
+export type LocationSource = "Carrier GPS" | "Vessel AIS" | "Port system" | "Operations" | "Customer";
+
+export interface KnownLocation {
   label: string;
-  location: string;
-  done: boolean;
+  updatedAt: string;
+  source: LocationSource;
+  /** false when we have no current fix and only a last-known location */
+  available: boolean;
+}
+
+export type EtaKind = "estimated" | "unknown" | "delayed" | "delivered";
+
+export interface Eta {
+  kind: EtaKind;
+  date?: string;
+  previousDate?: string; // set when delayed
+  updatedAt?: string;
+}
+
+export interface Vessel {
+  name: string;
+  voyage: string;
+  originPort: string;
+  destinationPort: string;
+  departure: string;
+  arrival: string;
+}
+
+export interface TimelineEvent {
+  id: string;
+  at: string;
+  title: string;
+  location?: string;
+  source?: LocationSource | "Dockie";
+  metadata?: string;
+}
+
+export interface ActivityEntry {
+  at: string;
+  actor: string;
+  text: string;
+}
+
+export type PhotoCategory = "Vehicle" | "Pickup" | "Condition" | "Arrival";
+
+export interface Photo {
+  id: string;
+  category: PhotoCategory;
+  caption: string;
+  takenAt: string;
 }
 
 export interface Shipment {
-  id: string; // e.g. DK-10482
-  reference: string; // customer's own PO / reference
+  id: string; // booking number, e.g. DK-10482
+  vehicle: Vehicle;
   status: ShipmentStatus;
-  mode: ShipmentMode;
-  carrier: string;
-  origin: Place;
-  destination: Place;
-  createdAt: string;
-  eta: string;
-  weightKg: number;
-  pieces: number;
-  cost: number;
-  currency: string;
-  aiNote?: string; // Dockie AI insight shown on the tracking page
-  events: TrackingEvent[];
+  type: ShipmentType;
+  origin: string;
+  destination: string;
+  location: KnownLocation;
+  eta: Eta;
+  vessel?: Vessel;
+  bookedAt: string;
+  lastUpdated: string;
+  delayReason?: string;
+  /** Operations has locked the shipment; Dockie actions on it fail (demo of ACTION_FAILED). */
+  locked?: boolean;
+  /** Seeded for the "new shipment" demo; hidden from lists until created. */
+  draft?: boolean;
+  timing: { purchaseToPickup?: number; pickupToBooking?: number; bookingToDeparture?: number };
+  events: TimelineEvent[];
+  activity: ActivityEntry[];
+  photos: Photo[];
 }
 
-export type InvoiceStatus = "paid" | "due" | "overdue";
+export type DocumentStatus = "required" | "uploaded" | "processing" | "verified" | "rejected";
+export type DocumentType = "Title" | "Dock receipt" | "Bill of lading" | "Invoice" | "Payment receipt" | "Photo ID";
 
-export interface Invoice {
+export interface ShipmentDocument {
   id: string;
-  shipmentIds: string[];
-  issuedAt: string;
-  dueAt: string;
+  type: DocumentType;
+  shipmentId: string;
+  status: DocumentStatus;
+  required: boolean;
+  fileName?: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+  note?: string; // e.g. rejection reason
+}
+
+export type PaymentStatus = "outstanding" | "pending" | "paid" | "overdue";
+
+export interface Payment {
+  id: string; // invoice number
+  shipmentId: string;
+  description: string;
   amount: number;
-  currency: string;
-  status: InvoiceStatus;
+  status: PaymentStatus;
+  dueAt: string;
+  paidAt?: string;
 }
 
-export interface RateOption {
+export type Role = "admin" | "operations" | "finance" | "viewer";
+
+export interface Member {
   id: string;
-  carrier: string;
-  service: string;
-  mode: ShipmentMode;
-  transitDays: [number, number];
-  price: number;
-  currency: string;
-  co2Kg: number;
-  tags: ("cheapest" | "fastest" | "recommended" | "greenest")[];
+  name: string;
+  email: string;
+  role: Role;
+  status: "active" | "invited";
+  lastActive?: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  href: string;
+  at: string;
+  unread: boolean;
+  tone: "info" | "warning" | "critical" | "success";
+}
+
+export interface ChatSummary {
+  id: string;
+  title: string;
+  object?: { type: "shipment" | "document" | "payment"; id: string; label: string };
+  lastMessage: string;
+  updatedAt: string;
+  unread?: boolean;
+  /** the first user message, replayed when the chat opens */
+  seed: string;
 }

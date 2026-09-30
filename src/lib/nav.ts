@@ -1,15 +1,12 @@
-import { CreditCard, FileText, LayoutDashboard, Package, PlusCircle, Settings, Sparkles } from "lucide-react";
+import { BarChart3, CreditCard, FileText, Home, MapPin, MessagesSquare, Package, type LucideIcon } from "lucide-react";
 
-// The sidebar is built from this list. To add a new module:
-//   1. create src/app/(app)/<name>/page.tsx
-//   2. add an entry here
-export const mainNav = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/shipments", label: "Shipments", icon: Package },
-  { href: "/shipments/new", label: "Get a quote", icon: PlusCircle },
-  { href: "/assistant", label: "Dockie AI", icon: Sparkles },
-  { href: "/billing", label: "Billing", icon: CreditCard },
-  { href: "/documents", label: "Documents", icon: FileText },
-] as const;
-
-export const secondaryNav = [{ href: "/settings", label: "Settings", icon: Settings }] as const;
+// Sidebar navigation (PRD §0). To add a module: create src/app/(app)/<name>/page.tsx and add it here.
+export const mainNav: { href: string; label: string; icon: LucideIcon; badge?: "chats" | "documents" | "issues" }[] = [
+  { href: "/home", label: "Home", icon: Home },
+  { href: "/chats", label: "Chats", icon: MessagesSquare, badge: "chats" },
+  { href: "/shipments", label: "Shipments", icon: Package, badge: "issues" },
+  { href: "/tracking", label: "Tracking", icon: MapPin },
+  { href: "/documents", label: "Documents", icon: FileText, badge: "documents" },
+  { href: "/payments", label: "Payments", icon: CreditCard },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+];

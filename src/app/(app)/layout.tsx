@@ -1,8 +1,6 @@
-import { AppShell } from "@/components/layout/app-shell";
+import { AppShell } from "@/components/app/app-shell";
 
-// Every page inside the (app) folder gets the sidebar + top bar.
-// The "(app)" folder name is in brackets, so it does NOT appear in the URL:
-// src/app/(app)/dashboard/page.tsx  →  /dashboard
+// Every authenticated screen shares this shell (PRD §0).
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return <AppShell>{children}</AppShell>;
 }
