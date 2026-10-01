@@ -19,7 +19,7 @@ The first prototype was built before the PRD existed. It modelled generic freigh
 | Home | KPI cards first | Needs attention *before* statistics, Dockie input as hero (§1) | ⚠️ Re-prioritised |
 | Onboarding, search, notifications, team, roles | — | Required (§10–14) | ❌ Added |
 | States | Some empty states | Loading, empty, error, permission, stale, pending, success, failure (§31) | ⚠️ Systematised |
-| Design system | Hand-rolled tokens | shadcn/ui zinc base | ❌ Migrated |
+| Design system | Hand-rolled tokens | shadcn/ui · Blue theme, Neutral base | ❌ Migrated |
 
 ## 2. Mobbin research → decisions
 

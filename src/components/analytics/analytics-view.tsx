@@ -14,10 +14,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { monthlyStats, routeStats } from "@/lib/data";
 import { shipmentStatus } from "@/lib/status";
 
-// Single-series charts: one ink (chart-1), one y-axis each, tooltips on hover, table view for accessibility.
-const volumeConfig = { shipments: { label: "Shipments", color: "var(--chart-1)" } } satisfies ChartConfig;
-const pickupConfig = { pickupDays: { label: "Avg purchase → pickup (days)", color: "var(--chart-1)" } } satisfies ChartConfig;
-const routeConfig = { avgDays: { label: "Avg door-to-door (days)", color: "var(--chart-1)" } } satisfies ChartConfig;
+// Single-series charts: one ink (chart-3), one y-axis each, tooltips on hover, table view for accessibility.
+const volumeConfig = { shipments: { label: "Shipments", color: "var(--chart-3)" } } satisfies ChartConfig;
+const pickupConfig = { pickupDays: { label: "Avg purchase → pickup (days)", color: "var(--chart-3)" } } satisfies ChartConfig;
+const routeConfig = { avgDays: { label: "Avg door-to-door (days)", color: "var(--chart-3)" } } satisfies ChartConfig;
 
 /** Analytics — operational performance, not a generic BI tool (PRD §9, P1). */
 export function AnalyticsView() {

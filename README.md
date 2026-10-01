@@ -1,7 +1,7 @@
 # Dockie — Customer Platform (frontend)
 
 Customer workspace for Dockie, the AI logistics agent for moving vehicles.
-**Next.js (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix, zinc).**
+**Next.js (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix · Blue theme · Neutral base).**
 All data is mocked. See `docs/design-audit.md` for the PRD audit and Mobbin references.
 
 ```bash
