@@ -14,7 +14,7 @@ const toneClass: Record<Tone, string> = {
   critical: "bg-destructive/10 text-destructive",
 };
 
-const toneIcon: Record<Tone, React.ComponentType<{ className?: string }>> = {
+export const toneIcon: Record<Tone, React.ComponentType<{ className?: string }>> = {
   neutral: Circle,
   progress: CircleDot,
   info: Clock,
