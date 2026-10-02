@@ -11,7 +11,7 @@ const uid = () => `m${++counter}-${Date.now()}`;
  * Conversation state machine: messages, the agent's pending flow, and action execution
  * (confirm → running → success/failed). Used by both the Dockie panel and the Chats page.
  */
-export function useConversation(context: DockieContext, initial: Message[] = []) {
+export function useConversation(context: DockieContext, initial: Message[] = [], { thinkMs = () => 650 }: { thinkMs?: () => number } = {}) {
   const ws = useWorkspace();
   const [messages, setMessages] = useState<Message[]>(initial);
   const [thinking, setThinking] = useState(false);
@@ -27,12 +27,13 @@ export function useConversation(context: DockieContext, initial: Message[] = [])
       if (t === "prompts") return; // "Ask another question" just refocuses the composer
       setMessages((m) => [...m, { id: uid(), role: "user", parts: [{ kind: "text", text: display ?? t }], at: Date.now() }]);
       setThinking(true);
+      const delay = thinkMs();
       setTimeout(() => {
         const res = respond(t, context, env, flow.current);
         flow.current = res.flow;
-        setMessages((m) => [...m, { id: uid(), role: "dockie", parts: res.parts, at: Date.now() }]);
+        setMessages((m) => [...m, { id: uid(), role: "dockie", parts: res.parts, at: Date.now(), thoughtMs: delay }]);
         setThinking(false);
-      }, 650);
+      }, delay);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [context, ws.shipments, ws.documents, ws.payments, ws.role],

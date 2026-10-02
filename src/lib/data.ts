@@ -340,11 +340,15 @@ export const notifications: Notification[] = [
 ];
 
 export const chats: ChatSummary[] = [
-  { id: "c1", title: "Why is the Lexus delayed?", object: { type: "shipment", id: "DK-10477", label: "2019 Lexus RX 350 · DK-10477" }, lastMessage: "The departure moved from Oct 5 to Oct 8…", updatedAt: "2026-09-30T09:40:00Z", unread: true, seed: "Why is DK-10477 delayed?" },
-  { id: "c2", title: "Camry ETA", object: { type: "shipment", id: "DK-10482", label: "2021 Toyota Camry · DK-10482" }, lastMessage: "The current estimated arrival is October 12.", updatedAt: "2026-09-30T09:12:00Z", seed: "When will DK-10482 arrive?" },
-  { id: "c3", title: "Missing titles", lastMessage: "3 shipments are missing titles.", updatedAt: "2026-09-29T17:05:00Z", seed: "Which shipments are missing titles?" },
-  { id: "c4", title: "Outstanding payments", lastMessage: "You have $10,500 outstanding across 3 invoices.", updatedAt: "2026-09-28T10:00:00Z", seed: "What payments are outstanding?" },
-  { id: "c5", title: "Quote: Pilot to Lagos", lastMessage: "Estimated $4,350 · 30–34 days door to port.", updatedAt: "2026-09-24T15:00:00Z", seed: "Start a shipment" },
+  { id: "c1", title: "Why is the Lexus delayed?", object: { type: "shipment", id: "DK-10477", label: "2019 Lexus RX 350 · DK-10477" }, lastMessage: "It's waiting on a title release in Savannah, so departure moved to Oct 8.", updatedAt: "2026-10-02T09:40:00Z", unread: true, seed: "Why is DK-10477 delayed?" },
+  { id: "c2", title: "Quote for a 2020 Honda Pilot", lastMessage: "About $4,350 from Newark to Lagos, 30–34 days door to port.", updatedAt: "2026-10-02T08:15:00Z", seed: "Get a shipping quote for my 2020 Honda Pilot" },
+  { id: "c3", title: "When will the Camry arrive?", object: { type: "shipment", id: "DK-10482", label: "2021 Toyota Camry · DK-10482" }, lastMessage: "It's on the water and due in Lagos on October 12.", updatedAt: "2026-10-01T16:20:00Z", seed: "When will DK-10482 arrive?" },
+  { id: "c4", title: "Shipping an F-150 to Lagos", lastMessage: "A truck that size ships RoRo, roughly $3,900 from Baltimore.", updatedAt: "2026-10-01T11:05:00Z", seed: "Get a quote to ship a Ford F-150 from Baltimore to Lagos" },
+  { id: "c5", title: "Where's my BMW X5?", object: { type: "shipment", id: "DK-10502", label: "2020 BMW X5 · DK-10502" }, lastMessage: "Picked up in Atlanta and on its way to the port.", updatedAt: "2026-09-30T14:30:00Z", unread: true, seed: "Where is DK-10502 right now?" },
+  { id: "c6", title: "Two cars in one container", lastMessage: "Sharing a 40ft container comes to about $2,600 per car.", updatedAt: "2026-09-29T10:10:00Z", seed: "Get a shipping quote for two cars in one container" },
+  { id: "c7", title: "Documents for the Accord", object: { type: "shipment", id: "DK-10491", label: "2020 Honda Accord · DK-10491" }, lastMessage: "The title is still missing. Upload it to avoid port delays.", updatedAt: "2026-09-28T17:45:00Z", seed: "Show documents for DK-10491" },
+  { id: "c8", title: "Outstanding invoices", lastMessage: "You owe $10,500 across 3 invoices, the next one due Oct 4.", updatedAt: "2026-09-27T09:00:00Z", seed: "What payments are outstanding?" },
+  { id: "c9", title: "Quote: Corolla to Cotonou", lastMessage: "Estimated $3,450 · 28–32 days door to port.", updatedAt: "2026-09-24T15:00:00Z", seed: "Get a quote to ship a Toyota Corolla to Cotonou" },
 ];
 
 // Analytics series (last 6 months).

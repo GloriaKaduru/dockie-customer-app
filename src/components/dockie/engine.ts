@@ -51,7 +51,8 @@ export type Part =
   | { kind: "vehicle"; vehicle: { year: number; make: string; model: string; trim: string; vin: string } }
   | { kind: "quote"; lines: [string, string][]; total: string };
 
-export type Message = { id: string; role: "user" | "dockie"; parts: Part[]; at: number };
+/** `thoughtMs`: how long Dockie thought before replying (shown as "Thought for 2s"). */
+export type Message = { id: string; role: "user" | "dockie"; parts: Part[]; at: number; thoughtMs?: number };
 
 // ---------- New-shipment flow state (PRD §22) ----------
 export type Flow =
