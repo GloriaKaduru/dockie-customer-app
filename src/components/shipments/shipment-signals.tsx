@@ -1,8 +1,6 @@
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CircleDashed, Clock, PackageCheck, type LucideIcon } from "lucide-react";
-import { toneIcon } from "@/components/domain/status-badge";
+import { AlertTriangle, CircleDashed, Clock, PackageCheck, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NOW, formatDate } from "@/lib/format";
-import { shipmentStatus, type Tone } from "@/lib/status";
 import type { Shipment } from "@/lib/types";
 
 // Small, reusable pieces of a shipment row. Colour is reserved for meaning:
@@ -11,12 +9,6 @@ import type { Shipment } from "@/lib/types";
 const DAY = 86_400_000;
 const utcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 const daysBetween = (from: string | Date, to: string | Date) => Math.round((utcDay(new Date(to)) - utcDay(new Date(from))) / DAY);
-
-const toneText: Partial<Record<Tone, string>> = {
-  critical: "text-destructive",
-  warning: "text-warning",
-  success: "text-success",
-};
 
 export const city = (place: string) => place.split(",")[0];
 
@@ -31,63 +23,6 @@ export function countdown(s: Shipment): Countdown {
   const days = daysBetween(NOW, s.eta.date);
   if (days <= 0) return { kind: "label", icon: Clock, label: days === 0 ? "Today" : "Due", className: "text-warning" };
   return { kind: "number", value: days, unit: days === 1 ? "day" : "days" };
-}
-
-/** Flighty-style countdown: a big number over a tiny uppercase unit, or an icon over a state word. */
-export function CountdownCell({ shipment, className }: { shipment: Shipment; className?: string }) {
-  const c = countdown(shipment);
-  return (
-    <div className={cn("flex w-14 shrink-0 flex-col items-center justify-center text-center", className)}>
-      {c.kind === "number" ? (
-        <>
-          <span className="text-2xl leading-none font-semibold tracking-tight tabular-nums">{c.value}</span>
-          <span className="mt-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">{c.unit}</span>
-        </>
-      ) : (
-        <>
-          <c.icon className={cn("size-5", c.className)} aria-hidden />
-          <span className={cn("mt-1.5 text-[10px] font-medium tracking-wider uppercase", c.className)}>{c.label}</span>
-        </>
-      )}
-    </div>
-  );
-}
-
-/** Status as an icon and words. Neutral unless the status carries meaning. */
-export function StatusLine({ shipment, className }: { shipment: Shipment; className?: string }) {
-  const { label, tone } = shipmentStatus[shipment.status];
-  const Icon = toneIcon[tone];
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 text-sm", toneText[tone] ?? "text-foreground", className)}>
-      <Icon className={cn("size-3.5 shrink-0", !toneText[tone] && "text-muted-foreground")} aria-hidden />
-      {label}
-    </span>
-  );
-}
-
-/** "Savannah to Accra", with the joining word quieter than the places. */
-export function RouteText({ shipment, className }: { shipment: Shipment; className?: string }) {
-  return (
-    <span className={cn("min-w-0 truncate", className)} title={`${shipment.origin} to ${shipment.destination}`}>
-      {city(shipment.origin)} <span className="font-normal text-muted-foreground">to</span> {city(shipment.destination)}
-    </span>
-  );
-}
-
-/** Origin and destination stacked with departure and arrival glyphs, for the web table. */
-export function RouteStack({ shipment }: { shipment: Shipment }) {
-  return (
-    <div className="space-y-1 text-sm">
-      <p className="flex items-center gap-1.5">
-        <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground" aria-label="From" />
-        {shipment.origin}
-      </p>
-      <p className="flex items-center gap-1.5">
-        <ArrowDownRight className="size-3.5 shrink-0 text-muted-foreground" aria-label="To" />
-        {shipment.destination}
-      </p>
-    </div>
-  );
 }
 
 /** ETA date plus one short note. Only the note that matters gets colour ("3d late", "Delivered"). */

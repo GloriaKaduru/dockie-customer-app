@@ -1,14 +1,12 @@
 "use client";
 
-import { ArrowUpDown, PackageCheck, Plus, Route, Search, X } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Plus, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Restricted } from "@/components/app/states";
 import { useWorkspace } from "@/components/app/workspace-provider";
 import { SetDockieContext, useDockie } from "@/components/dockie/dockie-provider";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { allStatuses, shipmentStatus, type StatusGroup } from "@/lib/status";
 import { timeAgo } from "@/lib/format";
@@ -17,6 +15,7 @@ import { ANY, ShipmentFilters, countFilters, docOptions, noFilters, payOptions, 
 import { ShipmentList, type Sort, type SortKey } from "./shipment-list";
 import { ShipmentSummary, type SummaryGroup } from "./shipment-summary";
 import { FirstShipment, NoActiveShipments, NoDeliveredShipments, NoMatches } from "./shipments-empty";
+import { Pill } from "./uber";
 
 type Tab = "active" | "delivered";
 /** Preview states for the prototype: ?state=empty | no-active | no-delivered */
@@ -98,7 +97,6 @@ export function ShipmentsView({ initialGroup, initialStatus, demo }: { initialGr
     setGroup(g);
     if (tab !== "active") changeTab("active");
   };
-  const onSort = (key: SortKey) => setSort((cur) => (cur.key === key ? { key, dir: cur.dir === "asc" ? "desc" : "asc" } : { key, dir: defaultDir(key, tab) }));
   const clearAll = () => {
     setFilters(noFilters);
     setGroup(null);
@@ -110,7 +108,7 @@ export function ShipmentsView({ initialGroup, initialStatus, demo }: { initialGr
     return (
       <>
         <SetDockieContext context={{ kind: "shipments" }} />
-        <h1 className="text-2xl font-semibold tracking-tight">Shipments</h1>
+        <h1 className="heading-xl max-sm:heading-m">Shipments</h1>
         <FirstShipment canCreate={canCreate} onCreate={startNewShipment} onAsk={() => ask("How does shipping a vehicle with Dockie work?")} />
       </>
     );
@@ -132,26 +130,24 @@ export function ShipmentsView({ initialGroup, initialStatus, demo }: { initialGr
       <>
         {/* Table numbers vs card numbers: when the list is narrowed, say so and show what narrowed it. */}
         {filtering && (
-          <div className="mb-3 flex min-h-7 flex-wrap items-center gap-1.5">
-            <p className="mr-1 text-sm text-muted-foreground tabular-nums">
+          <div className="mb-5 flex min-h-8 flex-wrap items-center gap-2">
+            <p className="mr-1 paragraph-s text-muted-foreground tabular-nums">
               Showing {rows.length} of {tabList.length}
             </p>
             {chips.map((c) => (
-              <Badge key={c.key} variant="outline" className="h-7 gap-1 rounded-full pr-1 pl-2.5 text-sm font-normal">
+              <Pill key={c.key} size="sm" selected onClick={c.remove} aria-label={`Remove filter: ${c.label}`} className="pr-2">
                 {c.label}
-                <button type="button" onClick={c.remove} aria-label={`Remove ${c.label}`} className="grid size-5 place-items-center rounded-full hover:bg-muted">
-                  <X className="size-3" />
-                </button>
-              </Badge>
+                <X />
+              </Pill>
             ))}
             {chips.length > 1 && (
-              <Button variant="link" size="xs" onClick={clearAll}>
+              <button type="button" onClick={clearAll} className="label-s underline underline-offset-4 hover:text-muted-foreground">
                 Clear all
-              </Button>
+              </button>
             )}
           </div>
         )}
-        {rows.length ? <ShipmentList shipments={rows} sort={sort} onSort={onSort} delivered={tab === "delivered"} /> : <NoMatches onClear={clearAll} />}
+        {rows.length ? <ShipmentList shipments={rows} sort={sort} delivered={tab === "delivered"} /> : <NoMatches onClear={clearAll} />}
       </>
     );
   };
@@ -161,10 +157,10 @@ export function ShipmentsView({ initialGroup, initialStatus, demo }: { initialGr
       <SetDockieContext context={{ kind: "shipments" }} />
 
       {/* Orientation: what am I looking at, how fresh is it */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Shipments</h1>
-          <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+          <h1 className="heading-xl max-sm:heading-m">Shipments</h1>
+          <p className="mt-1 paragraph-s text-muted-foreground tabular-nums">
             {active.length} active <span aria-hidden>·</span> {delivered.length} delivered
             {latest && (
               <>
@@ -175,7 +171,7 @@ export function ShipmentsView({ initialGroup, initialStatus, demo }: { initialGr
           </p>
         </div>
         <Restricted allowed={canCreate} reason="You don't have permission to create shipments.">
-          <Button onClick={startNewShipment} className="max-sm:size-9 max-sm:px-0" aria-label="New shipment">
+          <Button onClick={startNewShipment} className="h-11 gap-2 rounded-lg px-5 text-base max-sm:size-11 max-sm:px-0" aria-label="New shipment">
             <Plus />
             <span className="max-sm:sr-only">New shipment</span>
           </Button>
@@ -184,49 +180,54 @@ export function ShipmentsView({ initialGroup, initialStatus, demo }: { initialGr
 
       {/* Overview: global counts of active shipments, never affected by filters */}
       {active.length > 0 && (
-        <div className="mt-6">
+        <div className="mt-8">
           <ShipmentSummary shipments={active} selected={tab === "active" ? group : null} onSelect={selectGroup} />
         </div>
       )}
 
       {/* Work surface */}
-      <Tabs value={tab} onValueChange={changeTab} className="mt-8 gap-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <TabsList variant="line" className="h-9 w-full justify-start border-b lg:w-auto lg:border-0">
-            <TabsTrigger value="active" className="flex-none px-2">
-              <Route /> Active <span className="text-muted-foreground tabular-nums">{active.length}</span>
-            </TabsTrigger>
-            <TabsTrigger value="delivered" className="flex-none px-2">
-              <PackageCheck /> Delivered <span className="text-muted-foreground tabular-nums">{delivered.length}</span>
-            </TabsTrigger>
+      <Tabs value={tab} onValueChange={changeTab} className="mt-10 gap-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:border-b xl:items-end xl:justify-between">
+          <TabsList variant="line" className="h-auto w-full justify-start gap-6 rounded-none border-b p-0 xl:w-auto xl:border-0">
+            {(["active", "delivered"] as const).map((t) => (
+              <TabsTrigger
+                key={t}
+                value={t}
+                className="h-auto flex-none rounded-none px-0 pt-1 pb-3 heading-xs text-muted-foreground data-active:text-foreground group-data-horizontal/tabs:after:bottom-[-1px] group-data-horizontal/tabs:after:h-1"
+              >
+                {t === "active" ? "Active" : "Delivered"} <span className="label-m text-muted-foreground tabular-nums">{t === "active" ? active.length : delivered.length}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           {tabList.length > 0 && (
-            <div className="flex gap-2">
-              <InputGroup className="flex-1 lg:w-72 lg:flex-none">
-                <InputGroupAddon>
-                  <Search />
-                </InputGroupAddon>
-                <InputGroupInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search VIN, booking #, vehicle" aria-label="Search shipments" />
+            <div className="flex min-w-0 items-center gap-2 xl:pb-3">
+              {/* Uber's search: a filled grey pill, no border; black ring on focus */}
+              <label className="flex h-10 flex-1 items-center gap-2 rounded-full bg-secondary px-4 focus-within:ring-2 focus-within:ring-ring xl:w-80 xl:flex-none">
+                <Search className="size-4 shrink-0" aria-hidden />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search VIN, booking #, vehicle"
+                  aria-label="Search shipments"
+                  className="min-w-0 flex-1 bg-transparent paragraph-s outline-none placeholder:text-muted-foreground"
+                />
                 {query && (
-                  <InputGroupAddon align="inline-end">
-                    <button onClick={() => setQuery("")} aria-label="Clear search" className="text-muted-foreground hover:text-foreground">
-                      <X className="size-4" />
-                    </button>
-                  </InputGroupAddon>
+                  <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="grid size-5 place-items-center rounded-full bg-foreground text-background">
+                    <X className="size-3" />
+                  </button>
                 )}
-              </InputGroup>
+              </label>
               <ShipmentFilters filters={filters} onChange={setFilters} statusOptions={statusOptions} origins={places("origin")} destinations={places("destination")} resultCount={rows.length} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="max-lg:size-9 max-lg:px-0" aria-label={`Sort by ${sortLabels[sort.key]}`}>
-                    <ArrowUpDown />
-                    <span className="max-lg:sr-only">
-                      <span className="text-muted-foreground">Sort:</span> {sort.key === "eta" && tab === "delivered" ? "Delivered" : sortLabels[sort.key]}
-                    </span>
-                  </Button>
+                  <Pill className="max-lg:w-10 max-lg:justify-center max-lg:px-0" aria-label={`Sort by ${sortLabels[sort.key]}`}>
+                    <ArrowUpDown className="lg:hidden" />
+                    <span className="max-lg:sr-only">{sort.key === "eta" && tab === "delivered" ? "Delivered" : sortLabels[sort.key]}</span>
+                    <ChevronDown className="max-lg:hidden" />
+                  </Pill>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="uber min-w-52 rounded-xl p-2 shadow-lg">
                   <DropdownMenuLabel>Sort by</DropdownMenuLabel>
                   <DropdownMenuRadioGroup value={sort.key} onValueChange={(k) => setSort({ key: k as SortKey, dir: defaultDir(k as SortKey, tab) })}>
                     <DropdownMenuRadioItem value="updated">Last updated</DropdownMenuRadioItem>

@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  CalendarDays,
   Camera,
   Check,
   ChevronDown,
@@ -10,13 +11,17 @@ import {
   Download,
   Eye,
   FileText,
+  Hash,
   ImageIcon,
   LifeBuoy,
   Lock,
+  MapPin,
+  MapPinOff,
   MoreHorizontal,
   Pencil,
   Receipt,
   RefreshCw,
+  Ship,
   Sparkles,
   Trash2,
   Upload,
@@ -24,18 +29,13 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
-import { EmptyState, StaleNotice } from "@/components/app/states";
+import { StaleNotice } from "@/components/app/states";
 import { useWorkspace } from "@/components/app/workspace-provider";
 import { SetDockieContext, useDockie } from "@/components/dockie/dockie-provider";
 import { UploadDialog } from "@/components/documents/upload-dialog";
-import { ETADisplay } from "@/components/domain/eta-display";
-import { Journey } from "@/components/domain/journey";
-import { LocationDisplay } from "@/components/domain/location-display";
-import { DocumentStatusBadge, PaymentStatusBadge, StatusBadge } from "@/components/domain/status-badge";
 import { Timeline } from "@/components/domain/timeline";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,17 +44,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { dayLabel, formatDate, formatDateTime, formatMoney, hoursSince, timeAgo, vehicleName } from "@/lib/format";
 import type { Capability } from "@/lib/permissions";
+import { documentStatus, paymentStatus } from "@/lib/status";
 import type { DocumentType, PhotoCategory, Shipment } from "@/lib/types";
+import { city, countdown } from "./shipment-signals";
+import { InfoRow, journeyProgress, Pill, RouteMap, RouteSteps, SegmentedProgress, StatusTag, Tag } from "./uber";
 
 const TABS = ["overview", "tracking", "documents", "photos", "payments", "activity"] as const;
 type Tab = (typeof TABS)[number];
+
+/** Uber's trip headline: lead with when, not what ("Pickup in 3 min", "Dropoff at 7:44 PM"). */
+function headline(s: Shipment) {
+  const c = countdown(s);
+  if (s.status === "delivered") return s.eta.date ? `Delivered ${formatDate(s.eta.date, { weekday: "short", month: "short", day: "numeric" })}` : "Delivered";
+  if (s.status === "issue_reported") return "Issue on this shipment";
+  if (s.status === "ready_for_collection") return "Ready for collection";
+  if (c.kind === "number") return `Arriving in ${c.value} ${c.unit}`;
+  if (c.label === "Today") return "Arriving today";
+  if (c.label === "Due") return "Arrival overdue";
+  return "Waiting for pickup";
+}
 
 export function ShipmentDetail({ id, initialTab }: { id: string; initialTab?: string }) {
   const { getShipment, documents, payments, can } = useWorkspace();
@@ -66,6 +78,8 @@ export function ShipmentDetail({ id, initialTab }: { id: string; initialTab?: st
   const pays = payments.filter((p) => p.shipmentId === id);
   const missingDocs = docs.filter((d) => d.required && (d.status === "required" || d.status === "rejected"));
   const label = `${vehicleName(s.vehicle)} · ${s.id}`;
+  const { steps, current, done } = journeyProgress(s);
+  const c = countdown(s);
 
   const changeTab = (t: string) => {
     setTab(t as Tab);
@@ -84,47 +98,102 @@ export function ShipmentDetail({ id, initialTab }: { id: string; initialTab?: st
     { label: "Request support", icon: LifeBuoy, onSelect: () => toast.success("Support request sent", { description: "Operations will reply within an hour." }) },
   ];
 
+  const eta = s.eta;
+  const etaNote =
+    eta.kind === "unknown" || !eta.date ? (
+      "ETA available after pickup"
+    ) : eta.kind === "delayed" ? (
+      <span className="text-destructive">
+        Delayed from <span className="line-through">{eta.previousDate && formatDate(eta.previousDate)}</span>
+        {eta.updatedAt && ` · Updated ${timeAgo(eta.updatedAt)}`}
+      </span>
+    ) : eta.kind === "delivered" ? (
+      "Delivered"
+    ) : (
+      <>Estimated{eta.updatedAt && ` · Updated ${timeAgo(eta.updatedAt)}`}</>
+    );
+  const stale = hoursSince(s.location.updatedAt) > 48;
+
   return (
     <div className="space-y-6">
       <SetDockieContext context={{ kind: "shipment", id: s.id, label }} />
 
-      {/* Header (PRD §3.1) */}
-      <div className="space-y-3">
-        <Link href="/shipments" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" /> Shipments
-        </Link>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">{vehicleName(s.vehicle)}</h1>
-              <StatusBadge status={s.status} />
-            </div>
-            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              <span>
-                Booking <span className="text-foreground">#{s.id}</span>
-              </span>
-              <span className="flex items-center gap-1">
-                VIN <span className="font-mono text-foreground">{s.vehicle.vin}</span>
-                <CopyButton value={s.vehicle.vin} />
-              </span>
-            </p>
+      <Link href="/shipments" className="inline-flex items-center gap-2 label-s hover:underline hover:underline-offset-4">
+        <ArrowLeft className="size-4" /> Back to shipments
+      </Link>
+
+      {/* Alerts */}
+      {s.status === "issue_reported" && (
+        <Alert variant="destructive" className="rounded-xl border-destructive/30 bg-destructive/5">
+          <AlertTriangle />
+          <AlertTitle className="label-m">Issue reported · ETA moved to {s.eta.date && formatDate(s.eta.date)}</AlertTitle>
+          <AlertDescription>{s.delayReason}</AlertDescription>
+          <AlertAction>
+            <Pill size="sm" onClick={() => ask("Why is it delayed?")}>
+              <Sparkles /> Ask Dockie why
+            </Pill>
+          </AlertAction>
+        </Alert>
+      )}
+      {!s.location.available && <StaleNotice updatedAt={s.location.updatedAt} what="Location" />}
+      {s.locked && (
+        <p className="flex items-center gap-2 paragraph-s text-muted-foreground">
+          <Lock className="size-4" /> Operations has locked this shipment while they review the issue. Changes are paused.
+        </p>
+      )}
+
+      {/* Trip view (PRD §3.1–3.3): Uber's reservation panel beside the map */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:gap-6">
+        <section className="rounded-xl border p-5 sm:p-6" aria-label="Shipment summary">
+          <h1 className="heading-m max-sm:heading-s">{headline(s)}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Tag tone="strong">{vehicleName(s.vehicle)}</Tag>
+            <StatusTag shipment={s} />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setMode("open")}>
+
+          <SegmentedProgress shipment={s} className="mt-6" />
+          <p className="mt-2 paragraph-xs text-muted-foreground">
+            {done ? "All milestones complete" : `Step ${current + 1} of ${steps.length} · ${steps[current]}`}
+          </p>
+
+          <div className="mt-4">
+            <InfoRow icon={<CalendarDays />} title={eta.date ? formatDate(eta.date, { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : "ETA not set yet"}>
+              {etaNote}
+            </InfoRow>
+            <div className="border-b py-4">
+              <RouteSteps from={{ title: city(s.origin), detail: s.vessel ? `${s.origin} · ${s.vessel.originPort}` : s.origin }} to={{ title: city(s.destination), detail: s.vessel ? `${s.destination} · ${s.vessel.destinationPort}` : s.destination }} />
+            </div>
+            <InfoRow icon={s.location.available ? <MapPin /> : <MapPinOff />} title={s.location.available ? s.location.label : "Location unavailable"}>
+              {s.location.available ? (
+                <span className={cn(stale && "text-warning")}>
+                  {timeAgo(s.location.updatedAt)} · {s.location.source}
+                  {stale && " · may be outdated"}
+                </span>
+              ) : (
+                <>Last known: {s.location.label} · {formatDateTime(s.location.updatedAt)}</>
+              )}
+            </InfoRow>
+            <InfoRow icon={<Hash />} title={`Booking #${s.id}`} action={<CopyButton value={s.vehicle.vin} />}>
+              VIN <span className="font-mono text-foreground">{s.vehicle.vin}</span>
+            </InfoRow>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <Button variant="secondary" onClick={() => setMode("open")} className="h-12 gap-2 rounded-lg text-base">
               <Sparkles /> Ask Dockie
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button>
-                  Actions <ChevronDown />
+                <Button className="h-12 gap-2 rounded-lg text-base">
+                  Manage <ChevronDown />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="uber w-60 rounded-xl p-2 shadow-lg">
                 <DropdownMenuLabel>Shipment actions</DropdownMenuLabel>
                 {actions.map((a) => {
                   const allowed = !a.cap || can(a.cap);
                   return (
-                    <DropdownMenuItem key={a.label} disabled={!allowed} onSelect={a.onSelect}>
+                    <DropdownMenuItem key={a.label} disabled={!allowed} onSelect={a.onSelect} className="min-h-10 rounded-lg">
                       {allowed ? <a.icon /> : <Lock />}
                       <span className="flex-1">{a.label}</span>
                     </DropdownMenuItem>
@@ -139,125 +208,106 @@ export function ShipmentDetail({ id, initialTab }: { id: string; initialTab?: st
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </section>
+
+        <div className="relative order-first h-64 overflow-hidden rounded-xl sm:h-80 xl:order-none xl:h-auto">
+          <RouteMap
+            shipment={s}
+            variant="full"
+            className="absolute inset-0"
+            labels={{ from: `From ${city(s.origin)}`, to: `To ${city(s.destination)}`, badge: s.status !== "delivered" && c.kind === "number" ? `${c.value} ${c.unit}` : undefined }}
+          />
+          {s.location.available && s.status !== "delivered" && (
+            <span className="absolute top-3 left-3 inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 label-xs text-background shadow-lg">
+              <span className="size-2 rounded-full bg-live motion-safe:animate-pulse" aria-hidden />
+              Live · {timeAgo(s.location.updatedAt)}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Alerts */}
-      {s.status === "issue_reported" && (
-        <Alert variant="destructive">
-          <AlertTriangle />
-          <AlertTitle>Issue reported · ETA moved to {s.eta.date && formatDate(s.eta.date)}</AlertTitle>
-          <AlertDescription>{s.delayReason}</AlertDescription>
-          <AlertAction>
-            <Button size="sm" variant="outline" onClick={() => ask("Why is it delayed?")}>
-              <Sparkles /> Ask Dockie why
-            </Button>
-          </AlertAction>
-        </Alert>
-      )}
-      {!s.location.available && <StaleNotice updatedAt={s.location.updatedAt} what="Location" />}
-      {s.locked && (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Lock className="size-4" /> Operations has locked this shipment while they review the issue. Changes are paused.
-        </p>
-      )}
-
-      {/* Summary — understand state without scrolling (PRD §3.2) */}
-      <Card>
-        <CardContent className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label="Current location">
-            <LocationDisplay location={s.location} size="lg" />
-          </Fact>
-          <Fact label="ETA">
-            <ETADisplay eta={s.eta} size="lg" />
-          </Fact>
-          <Fact label="Origin">
-            <p className="text-2xl font-semibold tracking-tight">{s.origin.split(",")[0]}</p>
-            <p className="text-xs text-muted-foreground">{s.origin}</p>
-          </Fact>
-          <Fact label="Destination">
-            <p className="text-2xl font-semibold tracking-tight">{s.destination.split(",")[0]}</p>
-            <p className="text-xs text-muted-foreground">{s.destination}</p>
-          </Fact>
-        </CardContent>
-        <Separator />
-        <CardContent className="pt-2">
-          <Journey type={s.type} status={s.status} />
-        </CardContent>
-      </Card>
-
       {/* Information tabs (PRD §3.5) */}
-      <Tabs value={tab} onValueChange={changeTab}>
-        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TabsList variant="line" className="w-full justify-start border-b">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tracking">Tracking</TabsTrigger>
-            <TabsTrigger value="documents">
-              Documents
-              {missingDocs.length > 0 && <span className="grid size-4 place-items-center rounded-full bg-destructive text-[10px] text-white">{missingDocs.length}</span>}
-            </TabsTrigger>
-            <TabsTrigger value="photos">Photos</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
+      <Tabs value={tab} onValueChange={changeTab} className="pt-4">
+        <div className="-mx-4 overflow-x-auto border-b px-4 sm:mx-0 sm:px-0">
+          <TabsList variant="line" className="h-auto justify-start gap-6 p-0">
+            {TABS.map((t) => (
+              <TabsTrigger
+                key={t}
+                value={t}
+                className="h-auto flex-none rounded-none px-0 pt-1 pb-3 label-m text-muted-foreground capitalize data-active:text-foreground group-data-horizontal/tabs:after:bottom-[-1px] group-data-horizontal/tabs:after:h-1"
+              >
+                {t}
+                {t === "documents" && missingDocs.length > 0 && (
+                  <span className="grid size-5 place-items-center rounded-full bg-destructive text-[11px] text-white" aria-label={`${missingDocs.length} missing`}>
+                    {missingDocs.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 
-        <TabsContent value="overview" className="mt-4">
+        <TabsContent value="overview" className="mt-6">
           <Overview s={s} />
         </TabsContent>
-        <TabsContent value="tracking" className="mt-4">
+        <TabsContent value="tracking" className="mt-6">
           <Tracking s={s} />
         </TabsContent>
-        <TabsContent value="documents" className="mt-4">
+        <TabsContent value="documents" className="mt-6">
           <Documents docs={docs} canUpload={can("documents.upload")} onUpload={(type) => setUpload({ open: true, type })} />
         </TabsContent>
-        <TabsContent value="photos" className="mt-4">
+        <TabsContent value="photos" className="mt-6">
           <Photos s={s} />
         </TabsContent>
-        <TabsContent value="payments" className="mt-4">
+        <TabsContent value="payments" className="mt-6">
           {can("payments.view") ? (
-            <ItemGroup className="max-w-2xl gap-2">
-              {pays.length === 0 && <EmptyState icon={Receipt} title="No invoices yet" description="Invoices appear after pickup." />}
-              {pays.map((p) => (
-                <Item key={p.id} variant="outline" asChild>
-                  <Link href={`/payments?invoice=${p.id}`}>
-                    <ItemMedia variant="icon">
-                      <Receipt />
-                    </ItemMedia>
-                    <ItemContent>
-                      <ItemTitle>Invoice {p.id}</ItemTitle>
-                      <ItemDescription>
-                        {p.description} · due {formatDate(p.dueAt)}
-                      </ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                      <span className="font-medium tabular-nums">{formatMoney(p.amount)}</span>
-                      <PaymentStatusBadge status={p.status} />
-                    </ItemActions>
-                  </Link>
-                </Item>
-              ))}
-            </ItemGroup>
+            <section className="max-w-2xl">
+              {pays.length === 0 ? (
+                <Quiet icon={<Receipt />} title="No invoices yet" text="Invoices appear after pickup." />
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between border-b-2 border-foreground pb-3">
+                    <h2 className="heading-xs">Total</h2>
+                    <span className="heading-xs tabular-nums">{formatMoney(pays.reduce((n, p) => n + p.amount, 0))}</span>
+                  </div>
+                  <ul>
+                    {pays.map((p) => (
+                      <li key={p.id} className="border-b">
+                        <Link href={`/payments?invoice=${p.id}`} className="flex items-center gap-4 py-4 hover:bg-muted/60 sm:-mx-2 sm:rounded-lg sm:px-2">
+                          <Receipt className="size-5 shrink-0" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block label-m">{p.description}</span>
+                            <span className="mt-1 block paragraph-s text-muted-foreground">
+                              Invoice {p.id} · due {formatDate(p.dueAt)}
+                            </span>
+                          </span>
+                          <span className="flex flex-col items-end gap-1">
+                            <span className="label-m tabular-nums">{formatMoney(p.amount)}</span>
+                            <Tag tone={paymentStatus[p.status].tone}>{paymentStatus[p.status].label}</Tag>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
           ) : (
-            <EmptyState icon={Lock} title="Payments are restricted" description="You don't have permission to view payments. Contact your organization admin." />
+            <Quiet icon={<Lock />} title="Payments are restricted" text="You don't have permission to view payments. Contact your organization admin." />
           )}
         </TabsContent>
-        <TabsContent value="activity" className="mt-4">
-          <Card className="max-w-2xl">
-            <CardContent>
-              <ol className="space-y-4">
-                {s.activity.map((a, i) => (
-                  <li key={i} className="flex gap-4 text-sm">
-                    <span className="w-20 shrink-0 text-muted-foreground">{dayLabel(a.at)}</span>
-                    <span>
-                      <span className="font-medium">{a.actor}</span> {a.text}
-                      <span className="block text-xs text-muted-foreground">{formatDateTime(a.at)}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </CardContent>
-          </Card>
+        <TabsContent value="activity" className="mt-6">
+          <ol className="max-w-2xl">
+            {s.activity.map((a, i) => (
+              <li key={i} className="flex gap-4 border-b py-4 last:border-b-0">
+                <span className="w-24 shrink-0 label-s text-muted-foreground">{dayLabel(a.at)}</span>
+                <span className="paragraph-s">
+                  <span className="font-medium">{a.actor}</span> {a.text}
+                  <span className="mt-1 block paragraph-xs text-muted-foreground">{formatDateTime(a.at)}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         </TabsContent>
       </Tabs>
 
@@ -266,11 +316,15 @@ export function ShipmentDetail({ id, initialTab }: { id: string; initialTab?: st
   );
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+/** Quiet inline empty state: icon, bold line, one sentence. */
+function Quiet({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="min-w-0 space-y-1">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      {children}
+    <div className="flex max-w-2xl gap-4 rounded-xl bg-muted p-5 [&>svg]:size-5 [&>svg]:shrink-0">
+      {icon}
+      <div>
+        <p className="label-m">{title}</p>
+        <p className="mt-1 paragraph-s text-muted-foreground">{text}</p>
+      </div>
     </div>
   );
 }
@@ -278,10 +332,10 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 function CopyButton({ value }: { value: string }) {
   const [done, setDone] = useState(false);
   return (
-    <Button
-      variant="ghost"
-      size="icon-xs"
+    <Pill
+      size="sm"
       aria-label="Copy VIN"
+      className="self-center"
       onClick={() => {
         navigator.clipboard?.writeText(value);
         setDone(true);
@@ -289,15 +343,17 @@ function CopyButton({ value }: { value: string }) {
       }}
     >
       {done ? <Check /> : <Copy />}
-    </Button>
+      {done ? "Copied" : "Copy VIN"}
+    </Pill>
   );
 }
 
+/** Uber receipt rows: label left in grey, value right, hairline between. */
 function Dl({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
-    <dl className="divide-y text-sm">
+    <dl>
       {rows.map(([k, v]) => (
-        <div key={k} className="flex justify-between gap-4 py-2">
+        <div key={k} className="flex justify-between gap-4 border-b py-3 paragraph-s last:border-b-0">
           <dt className="text-muted-foreground">{k}</dt>
           <dd className="text-right font-medium">{v ?? "—"}</dd>
         </div>
@@ -306,111 +362,120 @@ function Dl({ rows }: { rows: [string, React.ReactNode][] }) {
   );
 }
 
+function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={className}>
+      <h2 className="mb-2 heading-xs">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 function Overview({ s }: { s: Shipment }) {
   const t = s.timing;
   const days = (n?: number) => (n === undefined ? "—" : `${n} day${n === 1 ? "" : "s"}`);
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-1">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Vehicle</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Dl
-              rows={[
-                ["VIN", <span key="v" className="font-mono text-xs">{s.vehicle.vin}</span>],
-                ["Year", s.vehicle.year],
-                ["Make", s.vehicle.make],
-                ["Model", s.vehicle.model],
-                ["Trim", s.vehicle.trim],
-                ["Purchase date", formatDate(s.vehicle.purchaseDate, { month: "short", day: "numeric", year: "numeric" })],
-              ]}
-            />
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Shipment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Dl
-              rows={[
-                ["Booking #", s.id],
-                ["Origin", s.origin],
-                ["Destination", s.destination],
-                ["Shipment type", s.type === "ocean" ? "Ocean (RoRo)" : "Inland"],
-                ["Booked", formatDate(s.bookedAt, { month: "short", day: "numeric", year: "numeric" })],
-              ]}
-            />
-          </CardContent>
-        </Card>
+    <div className="grid gap-10 lg:grid-cols-3">
+      <div className="space-y-10">
+        <Section title="Vehicle">
+          <Dl
+            rows={[
+              ["VIN", <span key="v" className="font-mono text-xs">{s.vehicle.vin}</span>],
+              ["Year", s.vehicle.year],
+              ["Make", s.vehicle.make],
+              ["Model", s.vehicle.model],
+              ["Trim", s.vehicle.trim],
+              ["Purchase date", formatDate(s.vehicle.purchaseDate, { month: "short", day: "numeric", year: "numeric" })],
+            ]}
+          />
+        </Section>
+        <Section title="Shipment">
+          <Dl
+            rows={[
+              ["Booking #", s.id],
+              ["Origin", s.origin],
+              ["Destination", s.destination],
+              ["Shipment type", s.type === "ocean" ? "Ocean (RoRo)" : "Inland"],
+              ["Booked", formatDate(s.bookedAt, { month: "short", day: "numeric", year: "numeric" })],
+            ]}
+          />
+        </Section>
         {/* Operational timing — visually secondary (PRD §3.6) */}
-        <div className="rounded-xl bg-muted/50 p-4">
-          <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">Operational timing</p>
+        <div className="rounded-xl bg-muted p-4">
+          <p className="mb-1 label-xs text-muted-foreground">Operational timing</p>
           <Dl rows={[["Purchase → Pickup", days(t.purchaseToPickup)], ["Pickup → Booking", days(t.pickupToBooking)], ["Booking → Departure", days(t.bookingToDeparture)]]} />
         </div>
       </div>
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Timeline events={s.events} />
-        </CardContent>
-      </Card>
+      <Section title="Timeline" className="lg:col-span-2">
+        <Timeline events={s.events} className="pt-2" />
+      </Section>
     </div>
+  );
+}
+
+/** Journey milestones as Uber's vertical route: filled dots done, ringed dot now, hollow dots ahead. */
+function Milestones({ s }: { s: Shipment }) {
+  const { steps, current, done } = journeyProgress(s);
+  const problem = s.status === "issue_reported";
+  return (
+    <ol aria-label="Shipment journey">
+      {steps.map((label, i) => {
+        const complete = done || i < current;
+        const now = !done && i === current;
+        const last = i === steps.length - 1;
+        return (
+          <li key={label} className="relative flex gap-4 pb-5 last:pb-0" aria-current={now ? "step" : undefined}>
+            {!last && <span className={cn("absolute top-4 bottom-0 left-[5px] w-0.5", complete ? "bg-foreground" : "bg-border")} aria-hidden />}
+            <span
+              className={cn(
+                "relative mt-1 size-3 shrink-0",
+                last ? "rounded-[2px]" : "rounded-full",
+                complete && "bg-foreground",
+                now && (problem ? "bg-destructive ring-4 ring-destructive/20" : "bg-live ring-4 ring-live/20"),
+                !complete && !now && "border-2 border-border bg-background",
+              )}
+              aria-hidden
+            />
+            <span className={cn("paragraph-s", now ? "font-semibold" : complete ? "" : "text-muted-foreground")}>
+              {label}
+              {now && problem && <span className="block paragraph-xs text-destructive">Issue reported</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
 function Tracking({ s }: { s: Shipment }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6">
-        <Card size="sm">
-          <CardContent className="space-y-4">
-            <Fact label="Current location">
-              <LocationDisplay location={s.location} />
-            </Fact>
-            <Fact label="Last updated">
-              <p className="text-sm font-medium">{formatDateTime(s.location.updatedAt)}</p>
-              <p className={cn("text-xs text-muted-foreground", hoursSince(s.location.updatedAt) > 48 && "text-warning")}>{timeAgo(s.location.updatedAt)}</p>
-            </Fact>
-            <Fact label="ETA">
-              <ETADisplay eta={s.eta} size="lg" />
-            </Fact>
-          </CardContent>
-        </Card>
+    <div className="grid gap-10 lg:grid-cols-3">
+      <div className="space-y-10">
+        <Section title="Journey">
+          <div className="pt-2">
+            <Milestones s={s} />
+          </div>
+        </Section>
         {s.vessel ? (
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>Vessel</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Dl
-                rows={[
-                  ["Vessel", s.vessel.name],
-                  ["Voyage", s.vessel.voyage],
-                  ["Origin port", s.vessel.originPort],
-                  ["Destination port", s.vessel.destinationPort],
-                  ["Departure", formatDateTime(s.vessel.departure)],
-                  ["Expected arrival", formatDateTime(s.vessel.arrival)],
-                ]}
-              />
-            </CardContent>
-          </Card>
+          <Section title="Vessel">
+            <Dl
+              rows={[
+                ["Vessel", <span key="v" className="inline-flex items-center gap-1.5"><Ship className="size-4" />{s.vessel.name}</span>],
+                ["Voyage", s.vessel.voyage],
+                ["Origin port", s.vessel.originPort],
+                ["Destination port", s.vessel.destinationPort],
+                ["Departure", formatDateTime(s.vessel.departure)],
+                ["Expected arrival", formatDateTime(s.vessel.arrival)],
+              ]}
+            />
+          </Section>
         ) : (
-          s.type === "ocean" && <p className="text-sm text-muted-foreground">Vessel details appear once the vehicle is booked on a sailing.</p>
+          s.type === "ocean" && <p className="paragraph-s text-muted-foreground">Vessel details appear once the vehicle is booked on a sailing.</p>
         )}
       </div>
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Recent events</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Timeline events={s.events} />
-        </CardContent>
-      </Card>
+      <Section title="Recent events" className="lg:col-span-2">
+        <Timeline events={s.events} className="pt-2" />
+      </Section>
     </div>
   );
 }
@@ -421,66 +486,67 @@ function Documents({ docs, canUpload, onUpload }: { docs: ReturnType<typeof useW
     { title: "Other", list: docs.filter((d) => !d.required) },
   ];
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" disabled={!canUpload} onClick={() => onUpload()}>
-          <Upload /> Upload
-        </Button>
-      </div>
+    <div className="max-w-3xl space-y-10">
       {groups.map(
-        (g) =>
+        (g, gi) =>
           g.list.length > 0 && (
             <section key={g.title}>
-              <h3 className="mb-2 text-sm font-medium text-muted-foreground">{g.title}</h3>
-              <ItemGroup className="gap-2">
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <h2 className="heading-xs">{g.title}</h2>
+                {gi === 0 && (
+                  <Pill disabled={!canUpload} onClick={() => onUpload()}>
+                    <Upload /> Upload
+                  </Pill>
+                )}
+              </div>
+              <ul>
                 {g.list.map((d) => {
                   const needsFile = d.status === "required" || d.status === "rejected";
+                  const st = documentStatus[d.status];
                   return (
-                    <Item key={d.id} variant="outline">
-                      <ItemMedia variant="icon">
-                        <FileText />
-                      </ItemMedia>
-                      <ItemContent>
-                        <ItemTitle>{d.type}</ItemTitle>
-                        <ItemDescription>{d.note ?? (d.uploadedAt ? `${d.fileName} · ${formatDate(d.uploadedAt)} by ${d.uploadedBy}` : "Not uploaded yet")}</ItemDescription>
-                      </ItemContent>
-                      <ItemActions>
-                        <DocumentStatusBadge status={d.status} />
-                        {needsFile ? (
-                          <Button size="sm" disabled={!canUpload} onClick={() => onUpload(d.type)}>
-                            {d.status === "rejected" ? "Replace" : "Upload"}
-                          </Button>
-                        ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon-sm" aria-label={`${d.type} actions`}>
-                                <MoreHorizontal />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link href={`/documents?doc=${d.id}`}>
-                                  <Eye /> Preview
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => toast(`Downloading ${d.fileName}`)}>
-                                <Download /> Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem disabled={!canUpload} onSelect={() => onUpload(d.type)}>
-                                <RefreshCw /> Replace
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem variant="destructive" disabled={!canUpload || d.status === "verified"}>
-                                <Trash2 /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </ItemActions>
-                    </Item>
+                    <li key={d.id} className="flex items-center gap-4 border-b py-4 last:border-b-0">
+                      <FileText className="size-5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="label-m">{d.type}</p>
+                        <p className="mt-1 truncate paragraph-s text-muted-foreground">{d.note ?? (d.uploadedAt ? `${d.fileName} · ${formatDate(d.uploadedAt)} by ${d.uploadedBy}` : "Not uploaded yet")}</p>
+                      </div>
+                      <Tag tone={st.tone} className="max-sm:hidden">
+                        {st.label}
+                      </Tag>
+                      {needsFile ? (
+                        <Button disabled={!canUpload} onClick={() => onUpload(d.type)} className="h-9 rounded-lg px-4">
+                          {d.status === "rejected" ? "Replace" : "Upload"}
+                        </Button>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Pill className="w-9 justify-center px-0" aria-label={`${d.type} actions`}>
+                              <MoreHorizontal />
+                            </Pill>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="uber rounded-xl p-2 shadow-lg">
+                            <DropdownMenuItem asChild className="rounded-lg">
+                              <Link href={`/documents?doc=${d.id}`}>
+                                <Eye /> Preview
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="rounded-lg" onSelect={() => toast(`Downloading ${d.fileName}`)}>
+                              <Download /> Download
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="rounded-lg" disabled={!canUpload} onSelect={() => onUpload(d.type)}>
+                              <RefreshCw /> Replace
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="rounded-lg" variant="destructive" disabled={!canUpload || d.status === "verified"}>
+                              <Trash2 /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </li>
                   );
                 })}
-              </ItemGroup>
+              </ul>
             </section>
           ),
       )}
@@ -493,29 +559,29 @@ const photoCats: ("All" | PhotoCategory)[] = ["All", "Vehicle", "Pickup", "Condi
 function Photos({ s }: { s: Shipment }) {
   const [cat, setCat] = useState<(typeof photoCats)[number]>("All");
   const list = s.photos.filter((p) => cat === "All" || p.category === cat);
-  if (s.photos.length === 0) return <EmptyState icon={ImageIcon} title="No photos yet" description="The transporter adds photos at pickup. You can add your own anytime." />;
+  if (s.photos.length === 0) return <Quiet icon={<ImageIcon />} title="No photos yet" text="The transporter adds photos at pickup. You can add your own anytime." />;
   return (
-    <div className="space-y-4">
-      <ToggleGroup type="single" value={cat} onValueChange={(v) => v && setCat(v as typeof cat)} variant="outline" size="sm">
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Photo category">
         {photoCats.map((c) => (
-          <ToggleGroupItem key={c} value={c}>
+          <Pill key={c} role="radio" aria-checked={cat === c} selected={cat === c} onClick={() => setCat(c)}>
             {c}
-          </ToggleGroupItem>
+          </Pill>
         ))}
-      </ToggleGroup>
+      </div>
       {list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No {cat.toLowerCase()} photos.</p>
+        <p className="paragraph-s text-muted-foreground">No {cat.toLowerCase()} photos.</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {list.map((p) => (
-            <figure key={p.id} className="overflow-hidden rounded-lg border">
+            <figure key={p.id}>
               {/* Placeholder until real images come from the API */}
-              <div className="grid aspect-[4/3] place-items-center bg-gradient-to-br from-muted to-secondary text-muted-foreground">
+              <div className="grid aspect-[4/3] place-items-center rounded-xl bg-muted text-muted-foreground">
                 <ImageIcon className="size-6" />
               </div>
-              <figcaption className="p-2 text-xs">
-                <span className="font-medium">{p.caption}</span>
-                <span className="block text-muted-foreground">
+              <figcaption className="mt-2">
+                <span className="block label-s">{p.caption}</span>
+                <span className="mt-1 block paragraph-xs text-muted-foreground">
                   {p.category} · {formatDate(p.takenAt)}
                 </span>
               </figcaption>

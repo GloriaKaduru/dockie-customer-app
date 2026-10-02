@@ -2,7 +2,6 @@
 
 import { Check, ChevronDown, ListFilter } from "lucide-react";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,6 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { cn } from "@/lib/utils";
 import { shipmentStatus } from "@/lib/status";
 import type { ShipmentStatus } from "@/lib/types";
+import { Pill } from "./uber";
 
 export const ANY = "any";
 
@@ -50,19 +50,18 @@ export function ShipmentFilters(props: PanelProps) {
   const [open, setOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const count = countFilters(props.filters);
+  // Uber's filter chip: grey pill, inverted to black while filters are applied.
   const trigger = (iconOnly: boolean) => (
-    <Button variant="outline" size={iconOnly ? "icon" : "default"} aria-label="Filters" className={cn("relative", iconOnly ? "lg:hidden" : "hidden lg:inline-flex")}>
+    <Pill selected={count > 0} aria-label={count ? `Filters, ${count} applied` : "Filters"} className={cn("relative", iconOnly ? "w-10 justify-center px-0 lg:hidden" : "hidden lg:inline-flex")}>
       <ListFilter />
       {!iconOnly && "Filters"}
       {count > 0 &&
         (iconOnly ? (
-          <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-primary text-[10px] text-primary-foreground tabular-nums">{count}</span>
+          <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-info text-[10px] text-white tabular-nums">{count}</span>
         ) : (
-          <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1 tabular-nums">
-            {count}
-          </Badge>
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-primary-foreground px-1 text-xs text-primary tabular-nums">{count}</span>
         ))}
-    </Button>
+    </Pill>
   );
 
   return (
@@ -71,7 +70,7 @@ export function ShipmentFilters(props: PanelProps) {
         <PopoverTrigger asChild>
           {trigger(false)}
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-90 p-0">
+        <PopoverContent align="end" className="uber w-90 rounded-xl p-0 shadow-lg">
           <FilterPanel {...props} onDone={() => setOpen(false)} />
         </PopoverContent>
       </Popover>
@@ -80,9 +79,9 @@ export function ShipmentFilters(props: PanelProps) {
         <SheetTrigger asChild>
           {trigger(true)}
         </SheetTrigger>
-        <SheetContent side="bottom" className="max-h-[85dvh] gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
+        <SheetContent side="bottom" className="uber max-h-[85dvh] gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]">
           <SheetHeader className="border-b">
-            <SheetTitle>Filters</SheetTitle>
+            <SheetTitle className="heading-xs">Filters</SheetTitle>
             <SheetDescription className="sr-only">Narrow the shipment list</SheetDescription>
           </SheetHeader>
           <FilterPanel {...props} sheet onDone={() => setSheetOpen(false)} />
@@ -116,10 +115,10 @@ function FilterPanel({ filters, onChange, statusOptions, origins, destinations, 
         <SingleRow title="Payments" value={filters.payStatus} options={payOptions} onSelect={(payStatus) => set({ payStatus })} summary={label(filters.payStatus, payOptions)} />
       </div>
       <div className="flex items-center justify-between gap-2 border-t p-3">
-        <Button variant="ghost" size="sm" onClick={() => onChange(noFilters)} disabled={countFilters(filters) === 0}>
+        <Button variant="secondary" className="h-10 rounded-lg px-4" onClick={() => onChange(noFilters)} disabled={countFilters(filters) === 0}>
           Clear all
         </Button>
-        <Button size="sm" onClick={onDone}>
+        <Button className="h-10 flex-1 rounded-lg px-4" onClick={onDone}>
           Show {resultCount} {resultCount === 1 ? "shipment" : "shipments"}
         </Button>
       </div>
@@ -130,8 +129,8 @@ function FilterPanel({ filters, onChange, statusOptions, origins, destinations, 
 function FilterRow({ title, summary, defaultOpen, children }: { title: string; summary: string; defaultOpen?: boolean; children: React.ReactNode }) {
   return (
     <Collapsible defaultOpen={defaultOpen} className="group/row">
-      <CollapsibleTrigger className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-sm hover:bg-muted/50">
-        <span className="font-medium">{title}</span>
+      <CollapsibleTrigger className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm hover:bg-muted">
+        <span className="label-m">{title}</span>
         <span className={cn("ml-auto truncate text-muted-foreground", summary !== "Any" && "text-foreground")}>{summary}</span>
         <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/row:rotate-180" aria-hidden />
       </CollapsibleTrigger>
@@ -162,9 +161,9 @@ function OptionRow({ selected, onSelect, multi, meta, children }: { selected: bo
       role={multi ? "checkbox" : "radio"}
       aria-checked={selected}
       onClick={onSelect}
-      className="flex min-h-10 w-full items-center gap-3 rounded-md px-2 text-left text-sm hover:bg-muted"
+      className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left paragraph-s hover:bg-muted"
     >
-      <span className={cn("grid size-4 shrink-0 place-items-center border", multi ? "rounded-[4px]" : "rounded-full", selected ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+      <span className={cn("grid size-5 shrink-0 place-items-center border-2", multi ? "rounded-[4px]" : "rounded-full", selected ? "border-primary bg-primary text-primary-foreground" : "border-foreground/40")}>
         {selected && <Check className="size-3" strokeWidth={3} />}
       </span>
       <span className="flex-1">{children}</span>
