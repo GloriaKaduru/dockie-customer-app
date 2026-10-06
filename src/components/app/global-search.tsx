@@ -38,7 +38,7 @@ export function GlobalSearch() {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)} className="h-8 min-w-0 flex-1 shrink justify-start gap-2 bg-muted/40 px-2.5 font-normal text-muted-foreground shadow-none sm:w-64 sm:flex-none lg:w-80">
+      <Button variant="outline" onClick={() => setOpen(true)} className="h-8 min-w-0 flex-1 shrink justify-start gap-2 bg-muted/40 px-2.5 font-normal text-muted-foreground shadow-none sm:w-64 sm:flex-initial lg:w-80">
         <Search />
         <span className="hidden truncate sm:inline">Search shipments, VINs, documents…</span>
         <span className="sm:hidden">Search</span>

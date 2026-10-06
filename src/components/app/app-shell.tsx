@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <DockieProvider>
         <SidebarProvider>
           <AppSidebar />
-          <SidebarInset className="flex-row">
+          <SidebarInset className="min-w-0 flex-row">
             <div className="flex min-w-0 flex-1 flex-col">
               <Header />
               <div className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</div>
